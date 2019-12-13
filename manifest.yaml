@@ -26,7 +26,7 @@ rules:
     verbs: ["get", "list", "update", "patch"]
   - apiGroups: ["apps"]
     resources: ["deployments/scale"]
-    verbs: ['*']
+    verbs: ["*"]
   - apiGroups: [""]
     resources: ["services", "events", "endpoints", "pods/logs"]
     verbs: ["get", "list"]
@@ -249,3 +249,205 @@ spec:
     - protocol: TCP
       port: 80
       targetPort: 80
+
+
+
+
+
+
+
+# ------------------BACKEND-------------------
+
+
+
+
+
+
+
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  namespace: nectar
+  name: postgres-pv
+  labels:
+    type: local
+spec:
+  capacity:
+    storage: 4Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/tmp/whatevs"
+
+
+---
+
+
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  namespace: nectar
+  name: postgres-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 4Gi
+
+
+---
+
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: nectar
+  name: postgres
+  labels:
+    app: backend
+    tier: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+      tier: postgres
+  template:
+    metadata:
+      name: postgres
+      labels:
+        app: backend
+        tier: postgres
+    spec:
+      volumes:
+        - name: postgres-pv
+          persistentVolumeClaim:
+            claimName: postgres-pvc
+      containers:
+        - name: postgres
+          image: postgres:9.6-alpine
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: mosaic
+                  key: db-user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mosaic
+                  key: db-password
+            - name: POSTGRES_DB
+              value: mosaic-postgres
+            - name: PGDATA
+              value: /var/lib/postgresql/data
+          ports:
+            - containerPort: 5432
+          volumeMounts:
+            - mountPath: "/var/lib/postgresql/data"
+              name: postgres-pv
+
+
+---
+
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: nectar
+  labels:
+    app: postgres
+spec:
+  ports:
+    - port: 5432
+  selector:
+    app: backend
+    tier: postgres
+
+
+---
+
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: nectar
+  labels:
+    app: backend
+    tier: server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+      tier: server
+  template:
+    metadata:
+      namespace: nectar
+      labels:
+        app: backend
+        tier: server
+    spec:
+      containers:
+        - name: main
+          image: xnectar/backend:latest
+          imagePullPolicy: 'Always'
+          args: ["rake db:create && rake db:migrate && rails server"]
+          env:
+          - name: DATABASE_URL
+            value: "postgres"
+          - name: DATABASE_NAME
+            value: "nectar-mosaic-database"
+          - name: DATABASE_PORT
+            value: "5432"
+          - name: DATABASE_USER
+            valueFrom:
+              secretKeyRef:
+                name: "mosaic"
+                key: "db-user"
+          - name: DATABASE_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: "mosaic"
+                key: "db-password"
+          - name: RAILS_ENV
+            value: "production"
+          - name: RAILS_LOG_TO_STDOUT
+            value: "true"
+          - name: SECRET_KEY_BASE
+            valueFrom:
+              secretKeyRef:
+                name: "mosaic"
+                key: "secret-key-base"
+          - name: ATTR_ENCRYPT_KEY
+            valueFrom:
+              secretKeyRef:
+                name: "mosaic"
+                key: "attr-encrypt-key"
+
+
+---
+
+
+kind: Service
+apiVersion: v1
+metadata:
+  name: backend
+  namespace: nectar
+  labels:
+    app: backend
+    tier: server
+spec:
+  type: ClusterIP
+  selector:
+    app: backend
+  ports:
+    - protocol: TCP
+      port: 3000
+      targetPort: 3000
+
+
+
