@@ -263,23 +263,6 @@ spec:
 
 
 
-
-kind: PersistentVolume
-apiVersion: v1
-metadata:
-  namespace: nectar
-  name: postgres-pv
-  labels:
-    type: local
-spec:
-  capacity:
-    storage: 4Gi
-  accessModes:
-    - ReadWriteOnce
-  hostPath:
-    path: "/tmp/whatevs"
-
-
 ---
 
 
@@ -288,12 +271,13 @@ apiVersion: v1
 metadata:
   namespace: nectar
   name: postgres-pvc
+  finalizers: null
 spec:
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 4Gi
+      storage: 100Mi
 
 
 ---
@@ -321,7 +305,7 @@ spec:
         tier: postgres
     spec:
       volumes:
-        - name: postgres-pv
+        - name: database
           persistentVolumeClaim:
             claimName: postgres-pvc
       containers:
@@ -346,7 +330,8 @@ spec:
             - containerPort: 5432
           volumeMounts:
             - mountPath: "/var/lib/postgresql/data"
-              name: postgres-pv
+              name: database
+              subPath: postgres
 
 
 ---
