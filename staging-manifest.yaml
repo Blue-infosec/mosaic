@@ -1,0 +1,438 @@
+# ------------------ PERMS----------------------
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nectar
+
+---
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: nectar
+  namespace: nectar
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: nectar-cluster-wide-role
+  namespace: nectar
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "update", "patch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments/scale"]
+    verbs: ["*"]
+  - apiGroups: [""]
+    resources: ["services", "events", "endpoints", "pods/logs"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["list"]
+  - apiGroups: [""]
+    resources: ["pods", "pods/exec", "pods/attach"]
+    verbs: ['*']
+
+
+---
+
+
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: nectar-permissions
+  namespace: nectar
+subjects:
+  - kind: ServiceAccount
+    name: nectar
+    namespace: nectar
+roleRef:
+  kind: ClusterRole
+  name: nectar-cluster-wide-role
+  apiGroup: rbac.authorization.k8s.io
+
+
+
+
+---
+
+
+
+
+
+# ------------------ KAPI DEP AND SVC----------------------
+
+
+
+
+
+
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kapi
+  namespace: nectar
+  labels:
+    app: kapi
+    core: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kapi
+  template:
+    metadata:
+      namespace: nectar
+      labels:
+        app: kapi
+    spec:
+      serviceAccountName: nectar
+      containers:
+        - name: main
+          image: xnectar/kapi:dev
+          imagePullPolicy: 'Always'
+          ports:
+            - containerPort: 5000
+          env:
+            - name: DOCKER_HOST
+              value: tcp://dind.nectar:2375
+
+
+---
+
+
+kind: Service
+apiVersion: v1
+metadata:
+  name: kapi
+  namespace: nectar
+  labels:
+    app: kapi
+    core: "true"
+spec:
+  type: ClusterIP
+  selector:
+    app: kapi
+  ports:
+    - protocol: TCP
+      port: 5000
+      targetPort: 5000
+
+---
+
+
+
+
+
+
+# ------------------ DIND DEP AND SVC----------------------
+
+
+
+
+
+
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dind
+  namespace: nectar
+  labels:
+    app: dind
+    core: "false"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dind
+  template:
+    metadata:
+      namespace: nectar
+      labels:
+        app: dind
+    spec:
+      serviceAccountName: nectar
+      containers:
+        - name: dind
+          image: docker:18.05-dind
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: dind-storage
+              mountPath: /var/lib/docker
+      volumes:
+        - name: dind-storage
+          emptyDir: {}
+
+
+---
+
+
+kind: Service
+apiVersion: v1
+metadata:
+  name: dind
+  namespace: nectar
+  labels:
+    app: dind
+    core: "false"
+spec:
+  type: ClusterIP
+  selector:
+    app: dind
+  ports:
+    - protocol: TCP
+      port: 2375
+      targetPort: 2375
+
+
+---
+
+
+
+
+
+
+# ------------------ FRONTEND DEP AND SVC----------------------
+
+
+
+
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: nectar
+  labels:
+    app: frontend
+    core: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      namespace: nectar
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: main
+          image: xnectar/frontend:dev
+          imagePullPolicy: 'Always'
+
+
+---
+
+
+kind: Service
+apiVersion: v1
+metadata:
+  name: frontend
+  namespace: nectar
+  labels:
+    app: frontend
+    core: "true"
+spec:
+  type: ClusterIP
+  selector:
+    app: frontend
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+
+
+
+
+
+
+
+# ------------------BACKEND-------------------
+
+
+
+
+
+
+---
+
+
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  namespace: nectar
+  name: postgres-pvc
+  finalizers: null
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Mi
+
+
+---
+
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: nectar
+  name: postgres
+  labels:
+    app: backend
+    tier: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+      tier: postgres
+  template:
+    metadata:
+      name: postgres
+      labels:
+        app: backend
+        tier: postgres
+    spec:
+      volumes:
+        - name: database
+          persistentVolumeClaim:
+            claimName: postgres-pvc
+      containers:
+        - name: postgres
+          image: postgres:9.6-alpine
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: mosaic-pg
+                  key: db-user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mosaic-pg
+                  key: db-password
+            - name: POSTGRES_DB
+              value: mosaic-postgres
+            - name: PGDATA
+              value: /var/lib/postgresql/data
+          ports:
+            - containerPort: 5432
+          volumeMounts:
+            - mountPath: "/var/lib/postgresql/data"
+              name: database
+              subPath: postgres
+
+
+---
+
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: nectar
+  labels:
+    app: postgres
+spec:
+  ports:
+    - port: 5432
+  selector:
+    app: backend
+    tier: postgres
+
+
+---
+
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: nectar
+  labels:
+    app: backend
+    tier: server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+      tier: server
+  template:
+    metadata:
+      namespace: nectar
+      labels:
+        app: backend
+        tier: server
+    spec:
+      containers:
+        - name: main
+          image: xnectar/backend:dev
+          imagePullPolicy: 'Always'
+          args: ["rake db:create && rake db:migrate && rails server -p 3000"]
+          env:
+          - name: DATABASE_URL
+            value: "postgres"
+          - name: DATABASE_NAME
+            value: "nectar-mosaic-database"
+          - name: DATABASE_PORT
+            value: "5432"
+          - name: DATABASE_USER
+            valueFrom:
+              secretKeyRef:
+                name: "mosaic-pg"
+                key: "db-user"
+          - name: DATABASE_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: "mosaic-pg"
+                key: "db-password"
+          - name: RAILS_ENV
+            value: "production"
+          - name: RAILS_LOG_TO_STDOUT
+            value: "true"
+          - name: SECRET_KEY_BASE
+            valueFrom:
+              secretKeyRef:
+                name: "mosaic-backend"
+                key: "secret-key-base"
+          - name: ATTR_ENCRYPT_KEY
+            valueFrom:
+              secretKeyRef:
+                name: "mosaic-backend"
+                key: "attr-encrypt-key"
+
+
+---
+
+
+kind: Service
+apiVersion: v1
+metadata:
+  name: backend
+  namespace: nectar
+  labels:
+    app: backend
+    tier: server
+spec:
+  type: ClusterIP
+  selector:
+    app: backend
+    tier: server
+  ports:
+    - protocol: TCP
+      port: 3000
+      targetPort: 3000
+
+

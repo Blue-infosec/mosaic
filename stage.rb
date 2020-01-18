@@ -1,0 +1,64 @@
+require 'securerandom'
+
+def rando(length)
+	SecureRandom.hex(length / 2)
+end
+
+def clear_cluster
+	system "kubectl delete ns/nectar --context=main"
+	system "kubectl delete clusterrole/nectar-cluster-wide-role"
+	system "kubectl delete clusterrolebinding/nectar-permissions"
+	system "kubectl delete secret mosaic-pg -n nectar"
+	system "kubectl delete secret mosaic-backend -n nectar"
+end
+
+def create_secret_cmd(name, data)
+	as_strings = data.keys.map do |key|
+		"--from-literal=#{key}=#{data[key]}"
+	end
+	"create secret generic #{name} #{as_strings.join(' ')}"
+end
+
+def create_secrets	
+	pg_secret_data = {'db-user': 'cluster', 'db-password': rando(40)}
+	system "kubectl #{create_secret_cmd("mosaic-pg", pg_secret_data)} -n nectar"
+
+	backend_secret_data = {'secret-key-base': rando(32), 'attr-encrypt-key': rando(128)}
+	system "kubectl #{create_secret_cmd("mosaic-backend", backend_secret_data)} -n nectar"	
+end
+
+def build(repo)
+	system "cd ./../#{repo} && docker build . -t xnectar/#{repo}:dev"
+end
+
+def push(repo)
+	system "docker push xnectar/#{repo}:dev"
+end
+
+def update_all
+	%w[frontend kapi backend].each do |repo|
+		build(repo)
+		push(repo)
+	end
+end
+
+def apply_manifest
+	system "kubectl apply -f staging-manifest.yaml"
+end
+
+def port_forward
+	system "kill -9 $(lsof -t -i:9000)"
+	system "kill -9 $(lsof -t -i:5000)"
+	system "kill -9 $(lsof -t -i:3000)"
+	Thread.new { system "kubectl port-forward svc/frontend 9000:80 -n nectar" }
+	Thread.new { system "kubectl port-forward svc/kapi 5000:5000 -n nectar" }
+	Thread.new { system "kubectl port-forward svc/backend 3000:3000 -n nectar" }
+end
+
+# update_all
+# clear_cluster
+# sleep(5)
+# apply_manifest
+# create_secrets
+port_forward
+
