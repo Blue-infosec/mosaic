@@ -1,14 +1,20 @@
 require 'dotenv/load'
 require 'securerandom'
 
+def real?
+  ARGV[0] == 'real'
+end
+
+def image_tag
+   real? ? 'latest' : 'dev'
+end
+
+def manifest_name
+  real? ? 'manifest.yaml' : 'staging-manifest.yaml'
+end
+
 def build_args
-	{
-		frontend: {},
-		backend: {
-			REVISION_SERVER_ID: ENV['REVISION_SERVER_ID'],
-			NECTAR_GITHUB_KEY: ENV['NECTAR_GITHUB_KEY']
-		}
-	}
+	{}
 end
 
 def rando(length)
@@ -16,7 +22,7 @@ def rando(length)
 end
 
 def clear_cluster
-	system "kubectl delete ns/nectar --context=main"
+	system "kubectl delete ns/nectar --context=dev"
 	system "kubectl delete clusterrole/nectar-cluster-wide-role"
 	system "kubectl delete clusterrolebinding/nectar-permissions"
 	system "kubectl delete secret mosaic-pg -n nectar"
@@ -42,11 +48,11 @@ def build(repo)
 	args = build_args[repo.to_sym] || {}
 	fmt_args = args.keys.map {|k| "--build-arg #{k}=#{args[k]}"}
 	args_str = fmt_args.join(' ')	
-	system "cd ./../#{repo} && docker build . #{args_str} -t xnectar/#{repo}:dev"
+	system "cd ./../#{repo} && docker build . #{args_str} -t xnectar/#{repo}:#{image_tag}"
 end
 
 def push(repo)
-	system "docker push xnectar/#{repo}:dev"
+	system "docker push xnectar/#{repo}:#{image_tag}"
 end
 
 def update_all
@@ -57,7 +63,7 @@ def update_all
 end
 
 def apply_manifest
-	system "kubectl apply -f staging-manifest.yaml"
+	system "kubectl apply -f #{manifest_name}"
 end
 
 def port_forward
@@ -69,9 +75,9 @@ def port_forward
 	Thread.new { system "kubectl port-forward svc/backend 3000:3000 -n nectar" }
 end
 
-# update_all
-# clear_cluster
-# sleep(5)
-# apply_manifest
-# create_secrets
-# port_forward
+#update_all unless real?
+#clear_cluster
+#sleep(5)
+#apply_manifest
+#create_secrets
+port_forward

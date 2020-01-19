@@ -28,7 +28,7 @@ rules:
     resources: ["deployments/scale"]
     verbs: ["*"]
   - apiGroups: [""]
-    resources: ["services", "events", "endpoints", "pods/logs"]
+    resources: ["services", "events", "endpoints", "pods/log"]
     verbs: ["get", "list"]
   - apiGroups: [""]
     resources: ["namespaces"]
@@ -299,7 +299,6 @@ spec:
       tier: postgres
   template:
     metadata:
-      name: postgres
       labels:
         app: backend
         tier: postgres
@@ -315,12 +314,12 @@ spec:
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
-                  name: mosaic
+                  name: mosaic-pg
                   key: db-user
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: mosaic
+                  name: mosaic-pg
                   key: db-password
             - name: POSTGRES_DB
               value: mosaic-postgres
@@ -334,7 +333,9 @@ spec:
               subPath: postgres
 
 
+
 ---
+
 
 
 apiVersion: v1
@@ -352,7 +353,9 @@ spec:
     tier: postgres
 
 
+
 ---
+
 
 
 apiVersion: apps/v1
@@ -380,38 +383,38 @@ spec:
         - name: main
           image: xnectar/backend:latest
           imagePullPolicy: 'Always'
-          args: ["rake db:create && rake db:migrate && rails server"]
+          args: ["rake db:create && rake db:migrate && rails server -p 3000"]
           env:
-          - name: DATABASE_URL
-            value: "postgres"
-          - name: DATABASE_NAME
-            value: "nectar-mosaic-database"
-          - name: DATABASE_PORT
-            value: "5432"
-          - name: DATABASE_USER
-            valueFrom:
-              secretKeyRef:
-                name: "mosaic"
-                key: "db-user"
-          - name: DATABASE_PASSWORD
-            valueFrom:
-              secretKeyRef:
-                name: "mosaic"
-                key: "db-password"
-          - name: RAILS_ENV
-            value: "production"
-          - name: RAILS_LOG_TO_STDOUT
-            value: "true"
-          - name: SECRET_KEY_BASE
-            valueFrom:
-              secretKeyRef:
-                name: "mosaic"
-                key: "secret-key-base"
-          - name: ATTR_ENCRYPT_KEY
-            valueFrom:
-              secretKeyRef:
-                name: "mosaic"
-                key: "attr-encrypt-key"
+            - name: DATABASE_URL
+              value: "postgres"
+            - name: DATABASE_NAME
+              value: "nectar-mosaic-database"
+            - name: DATABASE_PORT
+              value: "5432"
+            - name: DATABASE_USER
+              valueFrom:
+                secretKeyRef:
+                  name: "mosaic-pg"
+                  key: "db-user"
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: "mosaic-pg"
+                  key: "db-password"
+            - name: RAILS_ENV
+              value: "production"
+            - name: RAILS_LOG_TO_STDOUT
+              value: "true"
+            - name: SECRET_KEY_BASE
+              valueFrom:
+                secretKeyRef:
+                  name: "mosaic-backend"
+                  key: "secret-key-base"
+            - name: ATTR_ENCRYPT_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: "mosaic-backend"
+                  key: "attr-encrypt-key"
 
 
 ---
@@ -429,10 +432,11 @@ spec:
   type: ClusterIP
   selector:
     app: backend
+    tier: server
   ports:
     - protocol: TCP
       port: 3000
       targetPort: 3000
-
-
-
+  
+  
+  

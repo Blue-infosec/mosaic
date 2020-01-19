@@ -299,7 +299,6 @@ spec:
       tier: postgres
   template:
     metadata:
-      name: postgres
       labels:
         app: backend
         tier: postgres
