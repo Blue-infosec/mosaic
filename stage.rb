@@ -1,4 +1,15 @@
+require 'dotenv/load'
 require 'securerandom'
+
+def build_args
+	{
+		frontend: {},
+		backend: {
+			REVISION_SERVER_ID: ENV['REVISION_SERVER_ID'],
+			NECTAR_GITHUB_KEY: ENV['NECTAR_GITHUB_KEY']
+		}
+	}
+end
 
 def rando(length)
 	SecureRandom.hex(length / 2)
@@ -28,7 +39,10 @@ def create_secrets
 end
 
 def build(repo)
-	system "cd ./../#{repo} && docker build . -t xnectar/#{repo}:dev"
+	args = build_args[repo.to_sym] || {}
+	fmt_args = args.keys.map {|k| "--build-arg #{k}=#{args[k]}"}
+	args_str = fmt_args.join(' ')	
+	system "cd ./../#{repo} && docker build . #{args_str} -t xnectar/#{repo}:dev"
 end
 
 def push(repo)
@@ -60,5 +74,4 @@ end
 # sleep(5)
 # apply_manifest
 # create_secrets
-port_forward
-
+# port_forward

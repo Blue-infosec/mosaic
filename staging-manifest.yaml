@@ -28,7 +28,7 @@ rules:
     resources: ["deployments/scale"]
     verbs: ["*"]
   - apiGroups: [""]
-    resources: ["services", "events", "endpoints", "pods/logs"]
+    resources: ["services", "events", "endpoints", "pods/log"]
     verbs: ["get", "list"]
   - apiGroups: [""]
     resources: ["namespaces"]
@@ -334,7 +334,9 @@ spec:
               subPath: postgres
 
 
+          
 ---
+
 
 
 apiVersion: v1
@@ -352,7 +354,9 @@ spec:
     tier: postgres
 
 
+
 ---
+
 
 
 apiVersion: apps/v1
