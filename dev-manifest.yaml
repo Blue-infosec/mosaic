@@ -1,6 +1,7 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
+  namespace: nectar
   name: nectar-dev
 
 ---
@@ -11,7 +12,7 @@ metadata:
   name: nectar-dev
 subjects:
   - kind: User
-    name: system:serviceaccount:default:nectar-dev
+    name: system:serviceaccount:nectar:nectar-dev
 roleRef:
   kind: ClusterRole
   name: cluster-admin

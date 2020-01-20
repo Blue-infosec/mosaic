@@ -94,7 +94,7 @@ spec:
       serviceAccountName: nectar
       containers:
         - name: main
-          image: xnectar/kapi:latest
+          image: xnectar/kapi:dev
           imagePullPolicy: 'Always'
           ports:
             - containerPort: 5000
@@ -226,7 +226,7 @@ spec:
     spec:
       containers:
         - name: main
-          image: xnectar/frontend:latest
+          image: xnectar/frontend:dev
           imagePullPolicy: 'Always'
 
 
@@ -289,19 +289,19 @@ metadata:
   namespace: nectar
   name: postgres
   labels:
-    app: postgres
-    tier: database
+    app: backend
+    tier: postgres
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: postgres
-      tier: database
+      app: backend
+      tier: postgres
   template:
     metadata:
       labels:
-        app: postgres
-        tier: database
+        app: backend
+        tier: postgres
     spec:
       volumes:
         - name: database
@@ -333,7 +333,7 @@ spec:
               subPath: postgres
 
 
-
+          
 ---
 
 
@@ -349,8 +349,8 @@ spec:
   ports:
     - port: 5432
   selector:
-    app: postgres
-    tier: database
+    app: backend
+    tier: postgres
 
 
 
@@ -381,40 +381,40 @@ spec:
     spec:
       containers:
         - name: main
-          image: xnectar/backend:latest
+          image: xnectar/backend:dev
           imagePullPolicy: 'Always'
           args: ["rake db:create && rake db:migrate && rails server -p 3000"]
           env:
-            - name: DATABASE_URL
-              value: "postgres"
-            - name: DATABASE_NAME
-              value: "nectar-mosaic-database"
-            - name: DATABASE_PORT
-              value: "5432"
-            - name: DATABASE_USER
-              valueFrom:
-                secretKeyRef:
-                  name: "mosaic-pg"
-                  key: "db-user"
-            - name: DATABASE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: "mosaic-pg"
-                  key: "db-password"
-            - name: RAILS_ENV
-              value: "production"
-            - name: RAILS_LOG_TO_STDOUT
-              value: "true"
-            - name: SECRET_KEY_BASE
-              valueFrom:
-                secretKeyRef:
-                  name: "mosaic-backend"
-                  key: "secret-key-base"
-            - name: ATTR_ENCRYPT_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: "mosaic-backend"
-                  key: "attr-encrypt-key"
+          - name: DATABASE_URL
+            value: "postgres"
+          - name: DATABASE_NAME
+            value: "nectar-mosaic-database"
+          - name: DATABASE_PORT
+            value: "5432"
+          - name: DATABASE_USER
+            valueFrom:
+              secretKeyRef:
+                name: "mosaic-pg"
+                key: "db-user"
+          - name: DATABASE_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: "mosaic-pg"
+                key: "db-password"
+          - name: RAILS_ENV
+            value: "production"
+          - name: RAILS_LOG_TO_STDOUT
+            value: "true"
+          - name: SECRET_KEY_BASE
+            valueFrom:
+              secretKeyRef:
+                name: "mosaic-backend"
+                key: "secret-key-base"
+          - name: ATTR_ENCRYPT_KEY
+            valueFrom:
+              secretKeyRef:
+                name: "mosaic-backend"
+                key: "attr-encrypt-key"
 
 
 ---
@@ -437,6 +437,5 @@ spec:
     - protocol: TCP
       port: 3000
       targetPort: 3000
-  
-  
-  
+
+
