@@ -289,19 +289,19 @@ metadata:
   namespace: nectar
   name: postgres
   labels:
-    app: backend
-    tier: postgres
+    app: postgres
+    tier: database
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: backend
-      tier: postgres
+      app: postgres
+      tier: database
   template:
     metadata:
       labels:
-        app: backend
-        tier: postgres
+        app: postgres
+        tier: database
     spec:
       volumes:
         - name: database
@@ -349,8 +349,8 @@ spec:
   ports:
     - port: 5432
   selector:
-    app: backend
-    tier: postgres
+    app: postgres
+    tier: database
 
 
 

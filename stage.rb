@@ -75,9 +75,11 @@ def port_forward
 	Thread.new { system "kubectl port-forward svc/backend 3000:3000 -n nectar" }
 end
 
-#update_all unless real?
-#clear_cluster
-#sleep(5)
-#apply_manifest
-#create_secrets
-port_forward
+update_all unless real?
+clear_cluster
+sleep(5)
+apply_manifest
+create_secrets
+#port_forward
+
+
